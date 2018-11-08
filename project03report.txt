@@ -1,0 +1,48 @@
+As you answer these questions, remember to make explicit references to your
+code.  For example, don't just say, "I did such and so;" instead say, "I did
+such and so on main.cpp:13-15."  You may use the notation file:line or
+file:line:col to refer to places in your code.
+
+1.  Explain why your queue is thread-safe.  Tell, for each operation supported
+    by the queue (i.e., public method), what steps you took to make it
+    thread-safe.  Tell why are sure no one may bypass your safeguards to cause
+    race conditions.
+
+2.  How many threads did you create to handle requests?  Why did you select
+    this number?  Be sure to reference where in your code you create the
+    threads.
+
+3.  You should have had at least three global variables in your program: the
+    word list, the distance table, and the cache.  List, for each of these
+    variables, what steps you took to ensure that all accesses to them were
+    thread-safe.  Explain your reasoning.
+
+4.  Explain why your map is thread-safe.  Tell, for each operation supported
+    by the map (i.e., public method), what steps you took to make it
+    thread-safe.  Tell why you can be sure no one may bypass your safeguards
+    to cause race conditions.
+
+5.  Where in your code do you read and update the cache?  How much
+    syncrhonization do you expect for these operations: how likely are they to
+    block?
+
+6.  Explain your strategy for removing entries from the cache.  Explain why
+    your approach is thread-safe.
+
+7.  I asked you to create a second map to store timestamps.  Another option
+    would have been to store the timestamps in the cache along with the
+    results.  Explain the difference between these two operations in terms of
+    synchronization: is one approach more likely to cause blocking than
+    another?
+
+8.  (Optional) Tell me something interesting you learned from doing this
+    project.
+
+9.  (Optional) Tell me something you didn't like about this project.  Was it
+    something you think should be changed about the project, or just
+    something inherently difficult about the project?
+
+10. (Optional) Tell me something about your implementation that you are proud
+    of.  For example, something that was difficult to do but that you
+    eventually figured out; something that you feel you did particularly well;
+    or something that you did that was beyond what was asked.

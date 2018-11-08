@@ -1,0 +1,369 @@
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Comp 425 Project</title>
+    <base target="_top"/>
+    <link rel="stylesheet" href="../standard.css" type="text/css"/>
+    <script type="text/javascript" src="/gfoust/sh/scripts/shCore.js"></script>
+    <script type="text/javascript" src="/gfoust/sh/scripts/shBrushCpp.js"></script>
+    <script type="text/javascript">
+      SyntaxHighlighter.defaults.gutter = true;
+      SyntaxHighlighter.all();
+    </script>
+    <link type="text/css" rel="stylesheet" href="/gfoust/sh/styles/shCore.css"/>
+    <link type="text/css" rel="stylesheet" href="/gfoust/sh/styles/shThemeFoust.css"/>
+    <style>
+      img { padding: 3px; border: 1px solid #666 }
+    </style>
+  </head>
+  <body>
+    <h3>Overview</h3>
+    <p>
+      For this project we will be adding features to a spell-checking web
+      service.  We will use
+      the <a href="http://www.boost.org/doc/libs/1_61_0/doc/html/boost_asio.html">Boost.Asio</a>
+      library to create a simple HTTP server.  (The original code for the HTTP
+      server comes
+      from <a href="http://www.boost.org/doc/libs/1_61_0/doc/html/boost_asio/examples/cpp11_examples.html">
+      the Boost web site</a>; I have modified it some for this project.) In
+      order to keep the service responsive, we will implement a simple thread
+      pool for handling requests.  We will also implement a cache to be shared
+      across all threads.
+    </p>
+    <h3>Preparations</h3>
+    <p>
+      For this project we will be using Boost's asynchronous I/O library,
+      Boost.Asio, to create a simple HTTP server.  This open source library,
+      along with its documentation, is available from
+      the <a href="https://github.com/Microsoft/cpprestsdk">Boost web
+      site</a>.  However, I recommend you add the library to your project in
+      Visual Studio 2015 using NuGet.
+    </p>
+    <p>
+      First, create a project for a Win32 Console Application.  Then open the
+      &ldquo;Project&rdquo; menu and select &ldquo;Manage NuGet
+      Packages&hellip;&rdquo;.
+    </p>
+    <img style="width:70ex" src="boost/menu.png"/>
+    <p>
+      Boost is a very large collection of libraries, so instead of installing
+      the whole thing I recommend that you install only the components needed
+      by the Asio library: the system, regular expression, and date/time
+      libraries.  These correspond to
+      the <code>boost_system</code>, <code>boost_regex</code>,
+      and <code>boost_date_time</code> packages, respectively.
+    </p>
+    <p>
+      To install the <code>boot_system</code> package, first select the
+      &ldquo;Browse&rdquo; tab, then enter &ldquo;boost_system&rdquo; into the
+      search box.  The package of the same name should appear at the top of
+      the list.  Select this package, then click the &ldquo;Install&rdquo;
+      button in the panel on the right.
+    </p>
+    <img style="width:120ex" src="boost/boost_system.png"/>
+    <p>
+      Note that the package may take a few minutes to install depending on
+      your internet and computer speed.  Wait until the &ldquo;Finished&rdquo;
+      line appears in the &ldquo;Output&rdquo; window at the bottom before
+      proceeding.
+    </p>
+    <img style="width:120ex" src="boost/finished.png"/>
+    <p>
+      The <code>boost_regex</code> and <code>boost_date_time</code> packages
+      are installed in a similar manner.  After you have finished, selecting
+      the &ldquo;Installed&rdquo; tab should show the three packages installed
+      along with the <code>boost</code> package which includes the header
+      files needed to use the Boost library.  (The <code>boost</code> package
+      is installed automatically as a dependency of the other packages.)
+    </p>
+    <img style="width:120ex" src="boost/installed.png"/>
+    <p>
+      When compiling your project with Boost you may notice that you get
+      warning messages that read, &ldquo;<code>Please define _WIN32_WINNT or
+      _WIN32_WINDOWS appropriately</code>.&rdquo; You can safely ignore this
+      message, but if you would like to fix it then add the string
+      &ldquo;<code>_WIN32_WINNT=0x0603</code>&rdquo; to the preprocessor
+      directives in your project properties.
+    </p>
+    <img style="width:110ex" src="boost/preprocessor.png"/>
+    <h3>Starting point</h3>
+    <p>
+      I have provided you with a starting point to use for this project.
+      Download <a href="boost/SpellServerStart.zip">the zip file</a> and
+      extract it to your project directory.  Add all <kbd>.cpp</kbd>
+      and <kbd>.hpp</kbd> files to your project.  Most of these files you can
+      safely ignore; however, you should take a look at these two:
+    </p>
+    <h4><kbd>main.cpp</kbd></h4>
+    <p>
+      This is the file which contains your <code>main()</code> function, which
+      you can see below.
+    </p>
+    <pre class="brush:cpp first-line:58">// Initialize and run server
+int main()
+{
+	try
+	{
+		std::cout << "Listening on port 8000..." << std::endl;
+		http::server::server s("localhost", "8000", handle_request);
+		s.run();
+	}
+	catch (std::exception& e)
+	{
+		std::cerr << "exception: " << e.what() << "\n";
+	}
+
+	return 0;
+}</pre>
+    <p>
+      This function creates a server on line 64, then runs it on line 65.
+      Because this is a single-threaded application, the call
+      to <code>s.run()</code> will not return until the server has finished
+      running.  You can stop the server from running by
+      pressing <kbd>Ctrl-C</kbd>.
+    </p>
+    <p>
+      Note that anything in the <code>http::server</code> namespace comes from
+      the other files in the starting point of this project; if you want to
+      see the definition of the <code>server</code> class you can look in the
+      file <kbd>server.hpp</kbd>.
+    </p>
+    <p>
+      Next, look at the function <code>handle_request</code>, found below.
+    </p>
+    <pre class="brush:cpp first-line:45">// Called by server whenever a request is received
+// Must fill in reply, then call done()
+void handle_request(const http::server::request& req, http::server::reply& rep, http::server::done_callback done) {
+	std::cout << req.method << ' ' << req.uri << std::endl;
+	if (req.path == "/spell") {
+		spellcheck_request(req, rep);
+	}
+	else {
+		rep = http::server::reply::stock_reply(http::server::reply::not_found);
+	}
+	done();
+}</pre>
+    <p>
+      Notice that this function is given to the server when we create it
+      in <code>main</code> (line 64).  This function will be called by the server any
+      time an HTTP request is made.
+    </p>
+    <p>
+      The first thing this function does is to print a report of the request
+      to <code>cout</code> (line 48); this is a very simplistic logging
+      mechanism.  Next it examines the path requested and decides on a
+      function to call to handle the request.  In this case we only have a
+      single path which is mapped to a function: a request
+      for <code>/spell</code> will result in
+      calling <code>spellcheck_request</code> (line 50).
+    </p>
+    <p>
+      You'll notice that the <code>handle_request</code> function takes three
+      parameters.  The first is a constant request object; this contains
+      information about the request being made.  The second is a reply object;
+      this object is used to generate your response to the request.
+    </p>
+    <p>
+      The third parameter is a function to call once you have finished
+      handling the request.  Because we are implementing this web server
+      asynchronously, it will not assume that the response is ready just
+      because <code>handle_request</code> has finished.  You must call
+      the <code>done</code> function to indicate the reply is ready to be
+      written out.  You can see this on line 55.  This asynchronous approach
+      will be important as we make this web server multi-threaded, because it
+      will allow us to pass off the request to another thread; that other
+      thread can simply invoke <code>done</code> when it has finished.
+    </p>
+    <p>
+      Finally, look at the function <code>spellcheck_request</code>, shown below.
+    </p>
+    <pre class="brush:cpp first-line:22">// Handle request by doing spell check on query string
+// Render results as JSON
+void spellcheck_request(const http::server::request& req, http::server::reply& rep) {
+	// Set up reply
+	rep.status = http::server::reply::status_type::ok;
+	rep.headers["Content-Type"] = "application/json";
+
+	// Loop over spellcheck results
+	bool first = true;
+	rep.content << "[";
+	for (auto& candidate : spell::spellcheck(req.query)) {
+		if (first) {
+			first = false;
+		}
+		else {
+			rep.content << ", ";
+		}
+		rep.content << "\n  {word: \"" << candidate.word
+			<< "\", distance: " << candidate.distance << "}";
+	}
+	rep.content << "\n]";
+}</pre>
+    <p>
+      This function handles the request for our spell-checking web service by
+      filling in the request object it received as a parameter.  Notice that
+      it sets the status code for the request on line 26, fills in
+      the <code>Content-Type</code> header on line 27, then writes the
+      response to the <code>content</code> on lines 30&ndash;42.  The class
+      definitions for <code>request</code> and <code>reply</code> can be found
+      in the files <kbd>request.hpp</kbd> and <kbd>reply.hpp</kbd>,
+      respectively.
+    </p>
+    <h4><kbd>spell.cpp</kbd></h4>
+    <p>
+      This file contains the code that performs the spell checking.  It uses a
+      &ldquo;brute-force&rdquo; algorithm, calculating the edit distance
+      between the word to be spell-checked and each of the words in the word
+      list.  (I had no interest in optimizing this algorithm since (1) it is
+      not the point of the assignment, and (2) a less-efficient algorithm
+      increases the need for running in parallel.)
+    </p>
+    <p>
+      What you need to notice about this file is that it contains two global
+      variables.  The first is the word list, declared on line 38, as shown
+      below.  This is really just a <code>vector&lt;string&gt;</code> which I
+      turned into its own class so that I could initialize it in the
+      constructor.  Note that this list of words will never change throughout
+      the life of the program.
+    </p>
+    <pre class="brush:cpp first-line:38">  const WordList wordlist;</pre>
+    <p>
+      The second global variable is a table of integers used by the
+      spell-checking algorithm.  The edit-distance algorithm uses dynamic
+      programming techniques, and thus requires calculating answers for all
+      intermediate steps.  Rather than dynamically allocating a table for
+      every spell-check request, I create a global table and reuse it for each
+      request.  This variable is declared on line 60, as shown below
+    </p>
+    <pre class="brush:cpp first-line:60">  DistanceTable table</pre>
+    <p>
+      You need to be aware of these global variables so that you can handle
+      them correctly when multi-threading.
+    </p>
+    <h3>Running the Program</h3>
+    <p>
+      Run the program as you would any console application.  It will take a
+      few seconds to load the word list; then it should report that it is
+      listenting on port 8000.  As program runs you should see output on the
+      console reporting what requests it has received.
+    </p>
+    <img src="boost/console.png" style="width:120ex"/>
+    <p>
+      You may test the program using a browser.  Simply go to the
+      address <code>http://localhost:8000/spell?<var>word</var></code>,
+      where <var>word</var> is the word you wish to spell check.  It will take
+      several seconds, but eventually you should get back a response in the
+      JSON format listing the twenty words with shortest edit distance to the
+      word you queried.
+    </p>
+    <img src="boost/browser.png" style="width:120ex"/>
+    <h3>Project Requirements</h3>
+    <ol>
+      <li>
+        <p>
+          <i>(35%)</i> Design a thread-safe work queue.  The queue should have
+          enqueue and dequeue operations which use a mutex internally to make
+          them thread safe.  If the queue is empty, the dequeue operation
+          should use a condition variable to wait until there is something on
+          the queue&mdash;i.e., the dequeue operation blocks until it has
+          something to return.
+        </p>
+        <p>
+          Your program should create a global work queue to hold requests.
+          When your web server gets a request, it should package up everything
+          needed to handle the request and put it in the queue.
+        </p>
+      </li>
+      <li>
+        <p>
+          <i>(35%)</i> Your web service should use
+          the <code>thread::hardware_concurrency</code> function to select an
+          appropriate number of worker threads.  These threads should be
+          created at the beginning of the program.  The threads should
+          continually check the work queue and handle the requests they find
+          there.  When the main thread finishes (because the user presses
+          <kbd>Ctrl-C</kbd>) then these threads may be killed; you do not have
+          to wait for them to finish what they are doing.
+        </p>
+      </li>
+      <li>
+        <p>
+          <i>(10%)</i> Decide the proper way to handle the global variables
+          in <kbd>spell.cpp</kbd>.  Can these variables be shared across all
+          threads?  Should they be made <code>thread_local</code>?  Should
+          they be protected by a mutex?
+        </p>
+      </li>
+      <li>
+        <p>
+          <i>(10%)</i> Design a thread-safe map.  The map should support both
+          read and write operations which use a shared mutex internally to
+          make them thread safe.  Read operations should use a shared lock so
+          that multiple read operations can occur at the same time.  Write
+          operations should use an exclusive lock.
+        </p>
+      </li>
+      <li>
+        <p>
+          <i>(5%)</i> Create an instance of your map class to use as a cache.
+          When you first receive a spell-check request, look in the cache to
+          see if the results are already there.  If so, use them; if not,
+          proceed with the spell-checking algorithm, then store the
+          results in the cache to be used for future requests.
+        </p>
+      </li>
+      <li>
+        <p>
+          <i>(5%)</i> Add a second map which maps words to timestamps.  Each
+          time you receive a spell-check request, update the timestamp for the
+          word requested.  Thus, the map should tell us the <em>last</em> time
+          a particular word was requested.
+        </p>
+        <p>
+          Create a second web service at the path <code>/cachedump</code> that
+          returns the contents of this second map as JSON.  This web service
+          will tell you what strings are in the cache and how long it has been
+          since they have been accessed.
+        </p>
+        <p>
+          Make a thread which wakes up once a minute.  The thread should check
+          both maps and remove from them any entries for words which have not
+          been requested in over a minute.  While this is an overly-aggressive
+          cache-cleaning strategy, it should make it easy to observe the
+          thread in action.
+        </p>
+      </li>
+    </ol>
+    <h3>Project Report</h3>
+    <p>
+      Your grade for this project will be based on two things.  The first is
+      some test cases I will run to see if your program behaves as expected.
+      The second is your project report.  You should download
+      the <a href="project01report.txt">list of questions</a> I have provided
+      and fill in the answers.  Please submit your report as a plain text file
+      along with the source code to your project.
+    </p>
+    <p>
+      When writing your report, please be <dfn>thorough</dfn>&mdash;provide a
+      full answer to the question, not just a one-sentence summary; and
+      please be <dfn>succinct</dfn>&mdash;explain your answer directly and
+      without repetition.
+    </p>
+    <p>
+      There is no need to answer questions which address parts of the program
+      you did not do.  However, a particularly good answer may result in you
+      getting a few points even though you did not do that part of the
+      program.  Questions which are labeled optional are completely optional;
+      you will not loose any points for skipping them nor receive any points
+      for completing them.
+    </p>
+    <h3>Project Submission</h3>
+    <p>
+      You will turn in two files for this project.  The first is a zip file
+      containing all source code files which you have edited or created for
+      this project.  Source files which you have left unchanged do not need to
+      be submitted.  Do not submit other project files.  The second file to
+      submit is your project report.  This should be a plain text file.
+    </p>
+  </body>
+</html>
