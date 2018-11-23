@@ -14,26 +14,35 @@ using std::condition_variable;
 template<typename T>
 class work_queue {
 private:
-    mutex m;
-    condition_variable c;
-    queue<T> q;
+    mutex queueMutex;
+    condition_variable doesQueueHaveElements;
+    queue<T> queue;
+    bool isRunning = true;
 
 public:
-    void enqueue(T&& e) {
-        lock_guard lock(m);
-        q.emplace(e);
-        c.notify_one();
+    void stop() {
+        isRunning = false;
+        doesQueueHaveElements.notify_all();
     }
 
-    T dequeue() {
-        unique_lock lock(m);
+    void push(T &&e) {
+        lock_guard lock(queueMutex);
+        queue.emplace(e);
+        doesQueueHaveElements.notify_one();
+    }
 
-        while (q.size() == 0) {
-            c.wait(lock);
+    void waitForElement() {
+        unique_lock condition_lock(queueMutex);
+
+        while (queue.size() == 0 && isRunning) {
+            doesQueueHaveElements.wait(condition_lock);
         }
+    }
 
-        T&& e = move(q.front());
-        q.pop();
+    T pop() {
+        lock_guard lock(queueMutex);
+        T&& e = move(queue.front());
+        queue.pop();
         return e;
     }
 };
