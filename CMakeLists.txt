@@ -7,7 +7,7 @@ find_package(Boost REQUIRED system regex date_time thread)
 
 include_directories(${Boost_INCLUDE_DIR})
 
-file(GLOB server_src "src/*.h" "src/*.cpp")
+file(GLOB server_src "src/*.h" "src/*.cpp" "src/*.hpp")
 
 add_executable(multi_threaded_web_server ${server_src})
 

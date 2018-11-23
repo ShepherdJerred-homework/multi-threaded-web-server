@@ -278,7 +278,7 @@ void spellcheck_request(const http::server::request& req, http::server::reply& r
         <p>
           <i>(35%)</i> Your web service should use
           the <code>thread::hardware_concurrency</code> function to select an
-          appropriate number of worker threads.  These threads should be
+          appropriate number of request_queue threads.  These threads should be
           created at the beginning of the program.  The threads should
           continually check the work queue and handle the requests they find
           there.  When the main thread finishes (because the user presses
