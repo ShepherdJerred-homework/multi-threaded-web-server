@@ -13,7 +13,11 @@
 #include <queue>
 #include <string>
 #include <vector>
+#include <mutex>
 #include "spell.hpp"
+
+using std::mutex;
+using std::lock_guard;
 
 namespace spell {
 
@@ -58,8 +62,10 @@ namespace spell {
 	};
 
 	DistanceTable table;
+	mutex tableMutex;
 
 	unsigned string_distance(const std::string& a, const std::string& b) {
+		lock_guard lock(tableMutex);
 		table.resize(a.size() + 1, b.size() + 1);
 
 		for (unsigned j = 0; j <= b.size(); ++j) {
