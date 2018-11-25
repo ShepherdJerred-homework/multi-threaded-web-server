@@ -8,26 +8,56 @@ file:line:col to refer to places in your code.
     thread-safe.  Tell why are sure no one may bypass your safeguards to cause
     race conditions.
 
+The queue is made private, so it accessible only through the its public methods which are listed below.
+The push method will lock the queue mutex before adding to the queue.
+The pop method will lock the queue mutex before removing from the queue.
+The waitForElement method uses a condition variable and the queue mutex to wake a thread when a new element is pushed.
+The stop method does not touch the queue, so no precautions were needed for it.
+
 2.  How many threads did you create to handle requests?  Why did you select
     this number?  Be sure to reference where in your code you create the
     threads.
+
+My program uses hardware_concurrenccy * 2
+There is a balance to strike between average processing time for each request, which can be lowered by increasing the number of threads, and total processing time, which can be lowered by decreasing the number of threads. I think that this provides a good middle ground that will allow plenty of requests to be served at the same time without slowing the server down too much.
+main.cpp:182
 
 3.  You should have had at least three global variables in your program: the
     word list, the distance table, and the cache.  List, for each of these
     variables, what steps you took to ensure that all accesses to them were
     thread-safe.  Explain your reasoning.
 
+Word list
+No action was needed. Since the word list is never mutated except on startup, it is already thread-safe
+
+Distance table
+I created a mutex to protect the distance table, which is locked when running the string_distance algorithm. It may be better to create an instance on the table per thread, or to allocate the table with each invocation of the method.
+
+Cache
+Uses my thread-safe map
+
 4.  Explain why your map is thread-safe.  Tell, for each operation supported
     by the map (i.e., public method), what steps you took to make it
     thread-safe.  Tell why you can be sure no one may bypass your safeguards
     to cause race conditions.
 
+The underlying map is private, so it accessible only through class methods.
+
+I overloaded the bracket operator. When reading and writing, a mutex is locked.
+The contains function does a shared_lock on the mutex.
+The iterators do not lock, but from what I read locking is not required for iterators.
+
 5.  Where in your code do you read and update the cache?  How much
     syncrhonization do you expect for these operations: how likely are they to
     block?
 
+main:80
+They should only block when the cache is being written to or when it is being cleaned.
+
 6.  Explain your strategy for removing entries from the cache.  Explain why
     your approach is thread-safe.
+
+I iterate over every entry in the cache, check if it is older than 60 seconds, and if it is I erase it from the map. The thread then sleeps for 60 seconds. Because it uses my thread-safe map, this should all be thread-safe
 
 7.  I asked you to create a second map to store timestamps.  Another option
     would have been to store the timestamps in the cache along with the
@@ -35,14 +65,23 @@ file:line:col to refer to places in your code.
     synchronization: is one approach more likely to cause blocking than
     another?
 
+The worker would not be able to iterate over the cache while it is being written to. If the cache worker ran while there was a large amount of writing to the cache, it would take much longer to go through than if it had a seperate map.
+
 8.  (Optional) Tell me something interesting you learned from doing this
     project.
+
+I spent a lot of time trying to properly understand move semantics in C++, I think I now have a solid(ish) understanding of it. It also cemented how condition variable and shared mutexes work, and used the knowledge I had of operator overloading and C++ classes and templates, which I haven't used much since OOP a couple of years ago.
 
 9.  (Optional) Tell me something you didn't like about this project.  Was it
     something you think should be changed about the project, or just
     something inherently difficult about the project?
 
+N/A
+
 10. (Optional) Tell me something about your implementation that you are proud
     of.  For example, something that was difficult to do but that you
     eventually figured out; something that you feel you did particularly well;
     or something that you did that was beyond what was asked.
+
+My threads will all cleanly close, although the cache worker will take up to a minute to exit.
+

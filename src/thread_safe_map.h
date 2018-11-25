@@ -31,10 +31,12 @@ public:
     }
 
     bool contains(K key) {
+        shared_lock lock(mapMutex);
         return map.find(key) != map.end();
     }
 
     void erase(const K& key) {
+        lock_guard lock(mapMutex);
         map.erase(key);
     }
 

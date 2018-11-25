@@ -174,6 +174,7 @@ void cache_worker() {
             if (system_clock::now() > it->second + seconds(60)) {
                 cout << "Pruning " << it->first << endl;
                 cache_time.erase(it->first);
+                cache.erase(it->first);
             }
         }
     }
