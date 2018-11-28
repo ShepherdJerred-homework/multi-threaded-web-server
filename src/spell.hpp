@@ -20,7 +20,19 @@ namespace spell {
 		unsigned distance;
 	};
 
-	std::vector<candidate> spellcheck(const std::string& word);
+	class DistanceTable {
+		int data_size, row_size;
+		std::unique_ptr<int> data;
+
+	public:
+		DistanceTable(): data_size(0), row_size(0) {
+		}
+
+		int* operator[](int row);
+		void resize(int rows, int cols);
+	};
+
+	std::vector<candidate> spellcheck(const std::string& word, DistanceTable& table);
 }
 
 #endif

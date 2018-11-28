@@ -10,6 +10,7 @@ using std::lock_guard;
 using std::mutex;
 using std::queue;
 using std::condition_variable;
+using std::adopt_lock;
 
 template<typename T>
 class work_queue {
@@ -32,15 +33,19 @@ public:
     }
 
     void waitForElement() {
-        unique_lock condition_lock(queueMutex);
+        unique_lock lock(queueMutex);
 
         while (queue.size() == 0 && isRunning) {
-            doesQueueHaveElements.wait(condition_lock);
+            doesQueueHaveElements.wait(lock);
+        }
+
+        if (isRunning) {
+            lock.release();
         }
     }
 
     T pop() {
-        lock_guard lock(queueMutex);
+        lock_guard lock(queueMutex, adopt_lock);
         T&& e = move(queue.front());
         queue.pop();
         return e;

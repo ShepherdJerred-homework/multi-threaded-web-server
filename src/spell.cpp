@@ -13,11 +13,8 @@
 #include <queue>
 #include <string>
 #include <vector>
-#include <mutex>
 #include "spell.hpp"
 
-using std::mutex;
-using std::lock_guard;
 
 namespace spell {
 
@@ -41,31 +38,20 @@ namespace spell {
 	
 	const WordList wordlist;
 
-	class DistanceTable {
-		int data_size, row_size;
-		std::unique_ptr<int> data;
 
-	public:
-		DistanceTable() : data_size(0), row_size(0) { }
-
-		int* operator[](int row) {
+		int* DistanceTable::operator[](int row) {
 			return data.get() + row * row_size;
 		}
 
-		void resize(int rows, int cols) {
+		void DistanceTable::resize(int rows, int cols) {
 			if (rows * cols > data_size) {
 				data_size = rows * cols;
 				data.reset(new int[data_size]);
 			}
 			row_size = cols;
 		}
-	};
 
-	DistanceTable table;
-	mutex tableMutex;
-
-	unsigned string_distance(const std::string& a, const std::string& b) {
-		lock_guard lock(tableMutex);
+	unsigned string_distance(const std::string& a, const std::string& b, DistanceTable& table) {
 		table.resize(a.size() + 1, b.size() + 1);
 
 		for (unsigned j = 0; j <= b.size(); ++j) {
@@ -90,10 +76,10 @@ namespace spell {
 		return a.distance == b.distance ? a.word > b.word : a.distance < b.distance;
 	}
 
-	std::vector<candidate> spellcheck(const std::string& word) {
+	std::vector<candidate> spellcheck(const std::string& word, DistanceTable& table) {
 		std::priority_queue<candidate> candidates;
 		for (const std::string& possibility : wordlist) {
-			candidate c = { possibility, string_distance(word, possibility) };
+			candidate c = { possibility, string_distance(word, possibility, table) };
 			candidates.push(c);
 			if (candidates.size() > 20) {
 				candidates.pop();
